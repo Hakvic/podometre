@@ -11,7 +11,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-test_csv = os.path.join(current_dir, "ressources", "100_pas_seuil_10.csv")
+test_csv = os.path.join(current_dir, "ressources", "mathias_courir_acce.csv")
 
 
 class StepDetector():
@@ -77,7 +77,7 @@ class StepDetector():
         flag = 1
         pas = 0
         cpt = 0
-        seuil = 10 #numpy.mean(self.signal_filtre) * 1.3
+        seuil = numpy.mean(self.signal_filtre) * 1.3
         print(seuil)
         for data in self.signal_filtre:
             if (data > seuil) and (flag == 1):
@@ -98,7 +98,7 @@ class StepDetector():
         creux_precedent = None
         pique_creux = []
 
-        seuil = 10#numpy.mean(self.signal_filtre)*1.3
+        seuil = numpy.mean(self.signal_filtre)*1.3
         print("seuil: {}".format(seuil))
 
         acce_sum = 1
