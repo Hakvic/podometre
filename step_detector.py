@@ -164,7 +164,7 @@ class StepDetector():
         plt.show()
 
 
-def start_podometer(self):
+def start_podometer():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-f", "--fichier", dest="fichier",
                             help="mettre le nom du fichier a tester disponible dans ressources ")
@@ -186,6 +186,7 @@ def start_podometer(self):
 
 
 if __name__ == '__main__':
+    start_podometer()
     DETECTOR = StepDetector()
     DETECTOR.extraction_csv_donnees(test_csv)
     DETECTOR.filtre_signal(3, 100, 3.6)
