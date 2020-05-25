@@ -11,18 +11,19 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-test_csv = os.path.join(current_dir, "ressources", "mathias_courir_acce.csv")
+test_csv = os.path.join(current_dir, "ressources", "ludo_pas_gyro_50_0,75.csv")
 
 
 class StepDetector():
 
-    def __init__(self):
+    def __init__(self, seuil=None):
         self.time_array = None
         self.x_array = None
         self.y_array = None
         self.z_array = None
         self.total_array = None
         self.signal_filtre = None
+        self.seuil = seuil
 
     def extraction_csv_donnees(self, path_file):
         with open(path_file, 'r') as csv_file:
@@ -34,7 +35,7 @@ class StepDetector():
                 temps.append(float(ligne[0]))
                 x = (float(ligne[1]))
                 y = (float(ligne[2]))
-                z =(float(ligne[3]))
+                z = (float(ligne[3]))
                 r = math.sqrt(x ** 2 + y ** 2 + z ** 2)
                 rs.append(r)
 
@@ -48,8 +49,8 @@ class StepDetector():
 
     def filtre_passe_bas(self, ordre, fe, fc):
         # obtention de la frequence de Nyquist
-        fnyq = float(fe/2)
-        fc = float(fc/fnyq)
+        fnyq = float(fe / 2)
+        fc = float(fc / fnyq)
         b, a = signal.butter(ordre, fc, btype='low', analog=False)
         w, h = signal.freqs(b, a)
         plt.semilogx(w, 20 * numpy.log10(abs(h)))
@@ -77,19 +78,21 @@ class StepDetector():
         flag = 1
         pas = 0
         cpt = 0
-        seuil = numpy.mean(self.signal_filtre) * 1.3
-        print(seuil)
+
+        if self.seuil is None:
+            self.seuil = numpy.mean(self.signal_filtre) * 1.3
+
         for data in self.signal_filtre:
-            if (data > seuil) and (flag == 1):
+            if (data > self.seuil) and (flag == 1):
                 pas = pas + 1
                 flag = 0
                 cpt = 0
             cpt = cpt + 1
-            if cpt == 50:  # On attend 550ms,afin que la courbe de la force G en fonction du temps passe en dessous de 1.25
+            if cpt == 50:  # On attend 50ms,afin que la courbe de la force G en fonction du temps passe en dessous de 1.25
                 cpt = 0
                 flag = 1  # On remet le flag a 1, pour pouvoir recompter le nb de pas
             # On affiche le nombre de pas
-        print("Vous avez fait {} pas".format(pas))
+        print("Nombre de pas: {} par detection par seuil constant".format(pas))
 
     def detection_pas_adaptative(self):
         etat_precedent = None
@@ -98,16 +101,18 @@ class StepDetector():
         creux_precedent = None
         pique_creux = []
 
-        seuil = numpy.mean(self.signal_filtre)*1.3
-        print("seuil: {}".format(seuil))
+        if self.seuil is None:
+            self.seuil = numpy.mean(self.signal_filtre) * 1.3
+
+        print("seuil: {}".format(self.seuil))
 
         acce_sum = 1
-        acce_count = 1
+        acce_count = 10
 
         flag = True
         for i, point in enumerate(self.signal_filtre):
 
-            if point < seuil and etat_precedent is not None:
+            if point < self.seuil and etat_precedent is not None:
                 etat_actuel = 'creux'
                 if creux_precedent is None or point < creux_precedent["val"]:
                     creux_precedent = {
@@ -115,7 +120,7 @@ class StepDetector():
                         "val": self.signal_filtre[i],
                         "min_max": "min"
                     }
-            elif point > seuil:
+            elif point > self.seuil:
                 etat_actuel = 'pique'
                 if pique_precedent is None or point > pique_precedent["val"]:
                     pique_precedent = {
@@ -130,7 +135,7 @@ class StepDetector():
                     if pique_precedent:
                         acceleration = pique_precedent['val'] - creux_precedent['val']
                         if flag is True:
-                            acceleration_moyenne = acceleration
+                            acceleration_moyenne = acce_sum / acce_count  # acceleration
                             flag = False
                         else:
                             acceleration_moyenne = acce_sum / acce_count
@@ -153,7 +158,7 @@ class StepDetector():
         pas = self.detection_pas_adaptative()
         tps = [pa['tps'] for pa in pas]
         val = [pa['val'] for pa in pas]
-        print("Nombre de pas: {} ".format(len(pas)))
+        print("Nombre de pas: {} par detection par seuil variable".format(len(pas)))
 
         plt.plot(self.time_array, self.signal_filtre, 'b-', linewidth=2)
         plt.plot(tps, val, 'ro')
@@ -168,27 +173,29 @@ def start_podometer():
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-f", "--fichier", dest="fichier",
                             help="mettre le nom du fichier a tester disponible dans ressources ")
-    arg_parser.add_argument("-a", "--algo", dest="algo", type=int,
-                            help="taper 1 pour l'algorithme avec seuil,"
-                                 "taper 2 pour l'algortihme avec le seuil adaptative")
+    arg_parser.add_argument("-s", "--seuil", dest="seuil", type=float,
+                            help="rentrer le seuil voulu")
     arguments = arg_parser.parse_args()
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     test_csv = os.path.join(current_dir, "ressources", arguments.fichier)
 
-    DETECTOR = StepDetector()
+    if arguments.seuil is None:
+        DETECTOR = StepDetector()
+    else:
+        DETECTOR = StepDetector(arguments.seuil)
+
     DETECTOR.extraction_csv_donnees(test_csv)
     DETECTOR.filtre_signal(3, 100, 3)
-    if arguments.algo == 1:
-        DETECTOR.detection_pas_seuil()
-    elif arguments.algo == 2:
-        DETECTOR.nombre_de_pas()
+    DETECTOR.detection_pas_seuil()
+    DETECTOR.nombre_de_pas()
 
 
 if __name__ == '__main__':
     start_podometer()
-    DETECTOR = StepDetector()
-    DETECTOR.extraction_csv_donnees(test_csv)
-    DETECTOR.filtre_signal(3, 100, 3.6)
-    DETECTOR.nombre_de_pas()
-    DETECTOR.detection_pas_seuil()
+
+    #DETECTOR = StepDetector()
+    #DETECTOR.extraction_csv_donnees(test_csv)
+    #DETECTOR.filtre_signal(3, 100, 3.6)
+    #DETECTOR.nombre_de_pas()
+    #DETECTOR.detection_pas_seuil()
