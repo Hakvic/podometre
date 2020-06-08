@@ -11,7 +11,7 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
-test_csv = os.path.join(current_dir, "ressources", "ludo_pas_gyro_50_0,75.csv")
+test_csv = os.path.join(current_dir, "ressources", "ludo_demarche_acce_100_10.csv")
 
 
 class StepDetector():
@@ -52,16 +52,6 @@ class StepDetector():
         fnyq = float(fe / 2)
         fc = float(fc / fnyq)
         b, a = signal.butter(ordre, fc, btype='low', analog=False)
-        w, h = signal.freqs(b, a)
-        plt.semilogx(w, 20 * numpy.log10(abs(h)))
-        plt.title('Butterworth filter frequency response')
-        plt.xlabel('Frequency [radians / second]')
-        plt.ylabel('Amplitude [dB]')
-        plt.margins(0, 0.1)
-        plt.grid(which='both', axis='both')
-        plt.axvline(0.7, color='green')  # cutoff frequency
-        plt.show()
-
         return b, a
 
     def filtre_signal(self, ordre, fe, fc):
@@ -78,21 +68,40 @@ class StepDetector():
         flag = 1
         pas = 0
         cpt = 0
+        pas_infos = []
 
         if self.seuil is None:
             self.seuil = numpy.mean(self.signal_filtre) * 1.3
 
-        for data in self.signal_filtre:
+        for i,data in enumerate(self.signal_filtre):
             if (data > self.seuil) and (flag == 1):
                 pas = pas + 1
                 flag = 0
                 cpt = 0
+                pas_info = {
+                    "tps": self.time_array[i],
+                    "val": self.signal_filtre[i],
+                }
+                pas_infos.append(pas_info)
             cpt = cpt + 1
             if cpt == 50:  # On attend 50ms,afin que la courbe de la force G en fonction du temps passe en dessous de 1.25
                 cpt = 0
                 flag = 1  # On remet le flag a 1, pour pouvoir recompter le nb de pas
+
             # On affiche le nombre de pas
         print("Nombre de pas: {} par detection par seuil constant".format(pas))
+
+        tps = [pa['tps'] for pa in pas_infos]
+        val = [pa['val'] for pa in pas_infos]
+        plt.plot(self.time_array, self.signal_filtre, 'b-', linewidth=2)
+        plt.plot(tps, val, 'go')
+        plt.title(" Detection de pas")
+        plt.xlabel('Temps [sec]')
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+        return pas_infos
 
     def detection_pas_adaptative(self):
         etat_precedent = None
@@ -141,8 +150,7 @@ class StepDetector():
                             acceleration_moyenne = acce_sum / acce_count
 
                         if acceleration > acceleration_moyenne * .65:
-                            acceleration_normalise = 1.6 - (1.6 / (acceleration + 1))
-                            acce_sum += acceleration_moyenne * acceleration_normalise
+                            acce_sum += acceleration_moyenne * acceleration
                             acce_count += 1
                             pique_creux.append(creux_precedent)
                     creux_precedent = None
@@ -182,20 +190,21 @@ def start_podometer():
 
     if arguments.seuil is None:
         DETECTOR = StepDetector()
+
     else:
         DETECTOR = StepDetector(arguments.seuil)
 
     DETECTOR.extraction_csv_donnees(test_csv)
-    DETECTOR.filtre_signal(3, 100, 3)
+    DETECTOR.filtre_signal(3, 100, 3.6)
     DETECTOR.detection_pas_seuil()
     DETECTOR.nombre_de_pas()
 
 
 if __name__ == '__main__':
-    start_podometer()
+    #start_podometer()
 
-    #DETECTOR = StepDetector()
-    #DETECTOR.extraction_csv_donnees(test_csv)
-    #DETECTOR.filtre_signal(3, 100, 3.6)
-    #DETECTOR.nombre_de_pas()
-    #DETECTOR.detection_pas_seuil()
+    DETECTOR = StepDetector(10)
+    DETECTOR.extraction_csv_donnees(test_csv)
+    DETECTOR.filtre_signal(3, 100, 3.6)
+    DETECTOR.nombre_de_pas()
+    DETECTOR.detection_pas_seuil()
