@@ -201,10 +201,13 @@ def start_podometer():
 
 
 if __name__ == '__main__':
-    #start_podometer()
-
+    start_podometer()
+    
+    # Lancement du code sans le argparse
+    """
     DETECTOR = StepDetector(10)
     DETECTOR.extraction_csv_donnees(test_csv)
     DETECTOR.filtre_signal(3, 100, 3.6)
     DETECTOR.nombre_de_pas()
     DETECTOR.detection_pas_seuil()
+    """
